@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALOHA</title>
+    <style>
+        body,html {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            min-width: 100%;
+            min-height: 100vh;
+            display: block;
+        }
+        
+        #cy {
+            width: 100%;
+            height: 100%;
+            display: block;
+            outline: red;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="cy"></div>
+    <!-- <div id="console"></div>
+    <form>
+        <input type="text" placeholder="Send data to socket">
+    </form> -->
+
+    <script src="./js/cytoscape.min.js"></script>
+    <!-- <script src="./js/d3.js"></script> -->
+    <script src="./js/cola.min.js"></script>
+    <script src="./js/cytoscape-cola.js"></script>
+    <script>
+        const delay = async ms => new Promise((rs, _) => setTimeout(rs), ms);
+
+        const cy = cytoscape({
+            container: document.querySelector("#cy"),
+            style: [
+                {
+                    selector: 'node',
+                    css: {
+                        'background-color': '#f92411'
+                    }
+                },
+                {
+                    selector: 'edge',
+                    css: {
+                        'line-color': '#f92411'
+                    }
+                }
+            ]
+        });
+
+        let layout = cy.layout({
+            name: "cola",
+            infinite: true,
+            randomize: true
+        });
+
+        const state = {
+
+        };
+
+        let id = 0;
+
+        function addHeapNode(heapNodeId) {
+            cy.add({
+                group: "nodes",
+                data: {
+                    id: heapNodeId,
+                    // message: message
+                },
+                style: {
+                    "background-color": "red"
+                }
+            });
+
+            layout.stop();
+            layout.destroy();
+            layout = cy.layout({
+                name: 'cola',
+                infinite: true,
+                randomize: true,
+                fit: true,
+            });
+            layout.run();
+        }
+
+        function addMemoryNode(heapNodeId, memoryNodeId) {
+            cy.add({
+                group: "nodes",
+                data: {
+                    id: memoryNodeId,
+                    // message: message
+                },
+                style: {
+                    "background-color": "green"
+                }
+            });
+            cy.add({
+                group: "edges",
+                data: {
+                    id: id++,
+                    source: heapNodeId,
+                    target: memoryNodeId
+                }
+            });
+
+            layout.stop();
+            layout.destroy();
+            layout = cy.layout({
+                name: 'cola',
+                infinite: true,
+                randomize: true,
+                fit: true,
+            });
+            layout.run();
+
+            // let layout = cy.layout({
+            
+            // });
+            // layout.run();
+        }
+
+        async function main() {
+            const ws = new WebSocket("ws://localhost:9000");
+            
+            ws.addEventListener("open", (e) => {
+                // document.querySelector("#console").innerHTML += "<p>[CLIENT] HELLO</p>";
+                // cy.add({
+                //     group: "nodes",
+                //     data: {
+                //         id: client_id
+                //     }
+                // });
+                ws.send("HELLO");
+                // addMessage(cy, client_id, "HELLO");
+            });
+            ws.addEventListener("message", (e) => {
+                if(e.data == "HELLO") {
+                    return;
+                }
+
+                let message = JSON.parse(e.data)
+                console.log(message);
+                if(message["heap"] in state) {
+                    if(message["ret"] in state[message["heap"]]) {
+                        return;
+                    }
+
+                    addMemoryNode(message["heap"], message["ret"]);
+                    state[message["heap"]][message["ret"]] = true;
+                    return;
+                }
+                state[message["heap"]] = {};
+                addHeapNode(message["heap"]);
+                addMemoryNode(message["heap"], message["ret"]);
+                // document.querySelector("#console").innerHTML += "<p>[SERVER]" + message + "</p>";
+                // addMessage(cy, client_id, e.data);
+            });
+            // document.querySelector("form").addEventListener("submit", e => {
+            //     e.preventDefault();
+            //     let input = document.querySelector("form > input");
+            //     ws.send(input.value);
+            //     input.value = null;
+            // });
+        }
+
+        main();
+    </script>
+</body>
+
+</html>
